@@ -1,7 +1,29 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+	"log"
+	"os"
+)
+
+const (
+	MESSAGES_FILE = "messages.txt"
+)
 
 func main() {
-	fmt.Println("I hope I get the job!")
+	file, err := os.Open(MESSAGES_FILE)
+	if err != nil {
+		log.Fatalf("failed to open file: %v", err)
+	}
+
+	buf := make([]byte, 8)
+	for {
+		_, err = file.Read(buf)
+		if err == io.EOF {
+			break
+		}
+
+		fmt.Fprintf(os.Stdout, "read: %s\n", buf)
+	}
 }
