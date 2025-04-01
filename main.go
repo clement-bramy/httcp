@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 )
 
 const (
@@ -17,6 +18,7 @@ func main() {
 		log.Fatalf("failed to open file: %v", err)
 	}
 
+	str := ""
 	buf := make([]byte, 8)
 	for {
 		_, err = file.Read(buf)
@@ -24,6 +26,11 @@ func main() {
 			break
 		}
 
-		fmt.Fprintf(os.Stdout, "read: %s\n", buf)
+		str += string(buf)
+		parts := strings.Split(str, "\n")
+		if len(parts) > 1 {
+			fmt.Printf("read: %s\n", parts[0])
+			str = parts[1]
+		}
 	}
 }
