@@ -1,7 +1,9 @@
 package request
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -9,6 +11,7 @@ import (
 
 type Request struct {
 	RequestLine RequestLine
+	State       State
 }
 
 type RequestLine struct {
@@ -23,41 +26,137 @@ var (
 	InvalidHttpMethod       = errors.New("invalid HTTP method")
 	InvalidHttpVersion      = errors.New("invalid HTTP version")
 
+	ReadAttemptDoneState = errors.New("trying to read data in a done state")
+	UnknownParserState   = errors.New("error: unknown state")
+
 	validHttpMethods = []string{"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE"}
 )
 
+const (
+	bufferSize   = 8
+	growthFactor = 2
+)
+
+type State int
+
+const (
+	Initialised State = iota
+	Done
+)
+
 func RequestFromReader(reader io.Reader) (*Request, error) {
-	raw, err := io.ReadAll(reader)
-	if err != nil {
-		return &Request{}, err
+	readToIndex := 0
+	buf := make([]byte, bufferSize, bufferSize)
+	req := &Request{State: Initialised}
+	for req.State != Done {
+
+		if readToIndex >= len(buf) {
+			nbuf, err := reallocate(buf)
+			if err != nil {
+				return &Request{}, err
+			}
+			buf = nbuf
+			fmt.Printf("reallocated buf: [%d:%s]\n", len(buf), string(buf))
+		}
+
+		// read from readToIndex into the buffer
+		read, err := reader.Read(buf[readToIndex:])
+		if err == io.EOF {
+			req.State = Done
+			fmt.Println("EOF has been reached!")
+			break
+		}
+
+		readToIndex += read
+		read, err = req.parse(buf[:readToIndex])
+		if err != nil {
+			return &Request{}, err
+		}
+
+		if read > 0 {
+			nbuf := make([]byte, len(buf)-read)
+			_, err = io.Copy(bytes.NewBuffer(nbuf), bytes.NewReader(buf[readToIndex:]))
+			if err != nil {
+				return &Request{}, err
+			}
+			readToIndex -= read
+		}
 	}
 
-	parts := strings.Split(string(raw), "\r\n")
-	if len(parts) < 1 {
-		return &Request{}, InvalidHttpHeaderFormat
+	return req, nil
+}
+
+func reallocate(source []byte) ([]byte, error) {
+	length := len(source) * growthFactor
+	dest := make([]byte, length, length)
+
+	copied := copy(dest, source)
+	if copied < len(source) {
+		return []byte{}, fmt.Errorf("warn: reallocation did not copy entirely the source: [%d/%d]\n", copied, len(source))
 	}
 
-	requestLine := parts[0]
-	rparts := strings.Split(requestLine, " ")
+	return dest, nil
+}
+
+// State machine maintaining two states:
+//   - Initialised: processing incoming data
+//   - Done: read the expected data
+//
+// When data is *actually read*, returns the number of bytes read
+func (r *Request) parse(data []byte) (int, error) {
+	switch r.State {
+	case Initialised:
+		read, rl, err := parseRequestLine(data)
+		if err != nil {
+			return 0, err
+		}
+
+		if read == 0 {
+			return 0, nil
+		}
+
+		r.RequestLine = rl
+		r.State = Done
+		return read, err
+
+	case Done:
+		fmt.Printf("parser in done state - should not happen")
+		return 0, ReadAttemptDoneState
+
+	default:
+		fmt.Printf("parser in unknown state - should not happen")
+		return 0, UnknownParserState
+	}
+}
+
+func parseRequestLine(data []byte) (int, RequestLine, error) {
+	index := bytes.Index(data, []byte("\r\n"))
+
+	// not enough data to parse the request line
+	if index == -1 {
+		return 0, RequestLine{}, nil
+	}
+
+	line := string(data[:index])
+	rparts := strings.Split(line, " ")
 	if len(rparts) != 3 {
-		return &Request{}, InvalidHttpRequestLine
+		return 0, RequestLine{}, InvalidHttpRequestLine
 	}
 
-	rl := &Request{
-		RequestLine: RequestLine{
-			Method:        rparts[0],
-			RequestTarget: rparts[1],
-			HttpVersion:   strings.TrimPrefix(rparts[2], "HTTP/"),
-		},
+	rl := RequestLine{
+		Method:        rparts[0],
+		RequestTarget: rparts[1],
+		HttpVersion:   strings.TrimPrefix(rparts[2], "HTTP/"),
 	}
 
-	if !slices.Contains(validHttpMethods, rl.RequestLine.Method) {
-		return &Request{}, InvalidHttpMethod
+	if !slices.Contains(validHttpMethods, rl.Method) {
+		return 0, RequestLine{}, InvalidHttpMethod
 	}
 
-	if rl.RequestLine.HttpVersion != "1.1" {
-		return &Request{}, InvalidHttpVersion
+	if rl.HttpVersion != "1.1" {
+		return 0, RequestLine{}, InvalidHttpVersion
 	}
 
-	return rl, nil
+	// data has been read/parsed returning the size consumed
+	return len(data), rl, nil
 }

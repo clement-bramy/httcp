@@ -9,6 +9,7 @@ import (
 )
 
 func TestRequestLineParseOk(t *testing.T) {
+	t.Logf("Running %s", t.Name())
 	reader := &chunkReader{
 		data:            "GET / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
 		numBytesPerRead: 3,
@@ -23,6 +24,7 @@ func TestRequestLineParseOk(t *testing.T) {
 }
 
 func TestRequestLineParseOkWithPath(t *testing.T) {
+	t.Logf("Running %s", t.Name())
 	reader := &chunkReader{
 		data:            "GET /coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
 		numBytesPerRead: 95,
@@ -37,6 +39,7 @@ func TestRequestLineParseOkWithPath(t *testing.T) {
 }
 
 func TestRequestLineParsePostOk(t *testing.T) {
+	t.Logf("Running %s", t.Name())
 	reader := &chunkReader{
 		data:            "POST / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
 		numBytesPerRead: 1,
@@ -51,6 +54,7 @@ func TestRequestLineParsePostOk(t *testing.T) {
 }
 
 func TestRequestLineParsePostWithPathOk(t *testing.T) {
+	t.Logf("Running %s", t.Name())
 	reader := &chunkReader{
 		data:            "POST /coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
 		numBytesPerRead: 1,
@@ -65,6 +69,7 @@ func TestRequestLineParsePostWithPathOk(t *testing.T) {
 }
 
 func TestRequestLineParseGetKoParts(t *testing.T) {
+	t.Logf("Running %s", t.Name())
 	reader := &chunkReader{
 		data:            "GET HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
 		numBytesPerRead: 1,
@@ -75,6 +80,7 @@ func TestRequestLineParseGetKoParts(t *testing.T) {
 }
 
 func TestRequestLineParseKoInvalidPartsNumber(t *testing.T) {
+	t.Logf("Running %s", t.Name())
 	reader := &chunkReader{
 		data:            "/coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
 		numBytesPerRead: 10,
@@ -85,6 +91,7 @@ func TestRequestLineParseKoInvalidPartsNumber(t *testing.T) {
 }
 
 func TestRequestLineParseInvalidMethod(t *testing.T) {
+	t.Logf("Running %s", t.Name())
 	reader := &chunkReader{
 		data:            "HELLO /coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
 		numBytesPerRead: 1,
@@ -95,6 +102,7 @@ func TestRequestLineParseInvalidMethod(t *testing.T) {
 }
 
 func TestRequestLineParseInvalidHttpVersion(t *testing.T) {
+	t.Logf("Running %s", t.Name())
 	reader := &chunkReader{
 		data:            "GET /coffee HTTP/1.2\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
 		numBytesPerRead: 5,
