@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"strings"
+
+	"github.com/clement-bramy/httcp/internal/request"
 )
 
 const (
@@ -25,39 +25,17 @@ func main() {
 		}
 		defer conn.Close()
 		fmt.Println("accepted new connection..")
-
-		lines := getLinesChannel(conn)
-		for line := range lines {
-			fmt.Printf("%s\n", line)
+		req, err := request.RequestFromReader(conn)
+		if err != nil {
+			fmt.Printf("failed to parse incoming data: %v\n", err)
+			continue
 		}
+		fmt.Printf(
+			"Request line:\n- Method: %s\n- Target: %s\n- Version: %s\n",
+			req.RequestLine.Method,
+			req.RequestLine.RequestTarget,
+			req.RequestLine.HttpVersion,
+		)
 		fmt.Println("connection has been closed..")
 	}
-}
-
-func getLinesChannel(f io.ReadCloser) <-chan string {
-	out := make(chan string)
-
-	go func() {
-		defer close(out)
-		str := ""
-		for {
-			buf := make([]byte, 8)
-			l, err := f.Read(buf)
-			if err == io.EOF {
-				break
-			}
-
-			str += string(buf[:l])
-			parts := strings.Split(str, "\n")
-			if len(parts) > 1 {
-				out <- parts[0]
-				str = parts[1]
-			}
-		}
-		if str != "" {
-			out <- str
-		}
-	}()
-
-	return out
 }

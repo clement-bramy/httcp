@@ -56,7 +56,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 				return &Request{}, err
 			}
 			buf = nbuf
-			fmt.Printf("reallocated buf: [%d:%s]\n", len(buf), string(buf))
+			// fmt.Printf("reallocated buf: [%d:%s]\n", len(buf), string(buf))
 		}
 
 		// read from readToIndex into the buffer
