@@ -41,9 +41,15 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, InvalidKeyFormatCharacters
 	}
 
+	key = strings.ToLower(key)
 	value := strings.TrimSpace(parts[1])
 
-	h[strings.ToLower(key)] = value
+	if existing, found := h[key]; found {
+		h[key] = strings.Join([]string{existing, value}, ", ")
+	} else {
+		h[key] = value
+	}
+
 	return index + 2, false, nil
 }
 

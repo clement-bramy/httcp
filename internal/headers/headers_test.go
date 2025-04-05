@@ -104,3 +104,17 @@ func TestKeyInvalidCharacters(t *testing.T) {
 		})
 	}
 }
+
+func TestMultiValues(t *testing.T) {
+	headers := NewHeaders()
+	headers["content-type"] = "application/json"
+	data := "Content-Type:application/xml\r\n"
+
+	n, done, err := headers.Parse([]byte(data))
+
+	require.NoError(t, err)
+	require.NotNil(t, headers)
+	assert.Equal(t, 30, n)
+	assert.False(t, done)
+	assert.Equal(t, "application/json, application/xml", headers["content-type"])
+}
