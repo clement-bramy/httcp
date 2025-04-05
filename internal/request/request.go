@@ -7,10 +7,13 @@ import (
 	"io"
 	"slices"
 	"strings"
+
+	"github.com/clement-bramy/httcp/internal/headers"
 )
 
 type Request struct {
 	RequestLine RequestLine
+	Headers     headers.Headers
 	State       State
 }
 
@@ -41,13 +44,14 @@ type State int
 
 const (
 	Initialised State = iota
+	ParseHeaders
 	Done
 )
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	readToIndex := 0
 	buf := make([]byte, bufferSize, bufferSize)
-	req := &Request{State: Initialised}
+	req := &Request{State: Initialised, Headers: headers.NewHeaders()}
 	for req.State != Done {
 
 		if readToIndex >= len(buf) {
@@ -73,14 +77,8 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			return &Request{}, err
 		}
 
-		if read > 0 {
-			nbuf := make([]byte, len(buf)-read)
-			_, err = io.Copy(bytes.NewBuffer(nbuf), bytes.NewReader(buf[readToIndex:]))
-			if err != nil {
-				return &Request{}, err
-			}
-			readToIndex -= read
-		}
+		copy(buf, buf[read:])
+		readToIndex -= read
 	}
 
 	return req, nil
@@ -104,6 +102,23 @@ func reallocate(source []byte) ([]byte, error) {
 //
 // When data is *actually read*, returns the number of bytes read
 func (r *Request) parse(data []byte) (int, error) {
+	totalBytesParsed := 0
+	for r.State != Done {
+		n, err := r.parseSingle(data[totalBytesParsed:])
+		if err != nil {
+			return 0, err
+		}
+
+		totalBytesParsed += n
+		if n == 0 {
+			break
+		}
+	}
+
+	return totalBytesParsed, nil
+}
+
+func (r *Request) parseSingle(data []byte) (int, error) {
 	switch r.State {
 	case Initialised:
 		read, rl, err := parseRequestLine(data)
@@ -116,7 +131,23 @@ func (r *Request) parse(data []byte) (int, error) {
 		}
 
 		r.RequestLine = rl
-		r.State = Done
+		r.State = ParseHeaders
+		return read, err
+
+	case ParseHeaders:
+		read, done, err := r.Headers.Parse(data)
+		if err != nil {
+			return 0, err
+		}
+
+		if read == 0 {
+			return 0, nil
+		}
+
+		if done {
+			r.State = Done
+		}
+
 		return read, err
 
 	case Done:
@@ -158,5 +189,5 @@ func parseRequestLine(data []byte) (int, RequestLine, error) {
 	}
 
 	// data has been read/parsed returning the size consumed
-	return len(data), rl, nil
+	return index + 2, rl, nil
 }

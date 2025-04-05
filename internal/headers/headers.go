@@ -3,6 +3,7 @@ package headers
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -38,6 +39,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 	key, err = getValidKey(parts[0])
 	if err != nil {
+		fmt.Printf("invalid key: [%s][%s]\n", key, string(data))
 		return 0, false, InvalidKeyFormatCharacters
 	}
 
