@@ -3,8 +3,9 @@ package server
 import (
 	"fmt"
 	"net"
-	"os"
 	"sync/atomic"
+
+	"github.com/clement-bramy/httcp/internal/response"
 )
 
 type Server struct {
@@ -50,15 +51,8 @@ func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 	fmt.Println("handling new request")
 
-	response := "HTTP/1.1 200 OK\r\n" +
-		"Content-Type: text/plain\r\n" +
-		"\r\n" +
-		"Hello World!"
-
-	_, err := conn.Write([]byte(response))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write response: %v", err)
-	}
+	response.WriteStatusLine(conn, response.StatusOk)
+	response.WriteHeaders(conn, response.GetDefaultHeaders(0))
 
 	fmt.Println("done handling new request")
 }
