@@ -135,6 +135,67 @@ func TestParseHeadersKo(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestBodyOk(t *testing.T) {
+	reader := &chunkReader{
+		data: "POST /submit HTTP/1.1\r\n" +
+			"Host: localhost:42069\r\n" +
+			"Content-Length: 13\r\n" +
+			"\r\n" +
+			"hello world!\n",
+		numBytesPerRead: 3,
+	}
+	r, err := RequestFromReader(reader)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	assert.Equal(t, "hello world!\n", string(r.Body))
+}
+
+func TestBodyEmptyOk(t *testing.T) {
+	reader := &chunkReader{
+		data: "POST /submit HTTP/1.1\r\n" +
+			"Host: localhost:42069\r\n" +
+			"Content-Lenght: 0\r\n" +
+			"\r\n",
+		numBytesPerRead: 5,
+	}
+
+	r, err := RequestFromReader(reader)
+
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	assert.Len(t, r.Body, 0)
+}
+
+func TestBodyButNoLengthOk(t *testing.T) {
+	reader := &chunkReader{
+		data: "POST /submit HTTP/1.1\r\n" +
+			"Host: localhost:42069\r\n" +
+			"Content-Type: application/json\r\n" +
+			"\r\n" +
+			"{ \"key\": \"value\"}",
+		numBytesPerRead: 2,
+	}
+
+	r, err := RequestFromReader(reader)
+
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	assert.Len(t, r.Body, 0)
+}
+
+func TestBodyShorterThanLength(t *testing.T) {
+	reader := &chunkReader{
+		data: "POST /submit HTTP/1.1\r\n" +
+			"Host: localhost:42069\r\n" +
+			"Content-Length: 20\r\n" +
+			"\r\n" +
+			"partial content",
+		numBytesPerRead: 3,
+	}
+	_, err := RequestFromReader(reader)
+	require.Error(t, err)
+}
+
 type chunkReader struct {
 	data            string
 	numBytesPerRead int

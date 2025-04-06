@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -53,6 +54,25 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	return index + 2, false, nil
+}
+
+func (h Headers) Get(key string) (value string, found bool) {
+	key = strings.ToLower(key)
+	value, found = h[key]
+	return
+}
+
+func (h Headers) GetContentLength() (length int, found bool, err error) {
+	if value, found := h["content-length"]; found {
+		length, err := strconv.Atoi(value)
+		if err != nil {
+			return 0, false, fmt.Errorf("invalid content length: %s", value)
+		}
+
+		return length, true, nil
+	}
+
+	return 0, false, nil
 }
 
 const allowedSpecialChar = "!#$%&'*+-.^_`|~"

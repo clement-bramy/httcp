@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/clement-bramy/httcp/internal/headers"
@@ -14,6 +15,7 @@ import (
 type Request struct {
 	RequestLine RequestLine
 	Headers     headers.Headers
+	Body        []byte
 	State       State
 }
 
@@ -45,6 +47,7 @@ type State int
 const (
 	Initialised State = iota
 	ParseHeaders
+	ParseBody
 	Done
 )
 
@@ -66,6 +69,16 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		// read from readToIndex into the buffer
 		read, err := reader.Read(buf[readToIndex:])
 		if err == io.EOF {
+			if req.State == ParseBody {
+				length, found, err := req.Headers.GetContentLength()
+				if err != nil {
+					return &Request{}, err
+				}
+
+				if found && len(req.Body) != length {
+					return &Request{}, fmt.Errorf("invalid body length, expected %d, got %d", length, len(req.Body))
+				}
+			}
 			req.State = Done
 			fmt.Println("EOF has been reached!")
 			break
@@ -145,10 +158,34 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 		}
 
 		if done {
-			r.State = Done
+			r.State = ParseBody
 		}
 
 		return read, err
+
+	case ParseBody:
+		var length int
+		slength, found := r.Headers.Get("Content-Length")
+		if !found {
+			r.State = Done
+			return 0, nil
+		}
+
+		length, err := strconv.Atoi(slength)
+		if err != nil {
+			return 0, fmt.Errorf("invalid Content-Length header value: %s, %v", slength, err)
+		}
+
+		r.Body = append(r.Body, data...)
+		if len(r.Body) > length {
+			return 0, fmt.Errorf("invalid body: longer than expected: %d/%d", len(r.Body), length)
+		}
+
+		if len(r.Body) == length {
+			r.State = Done
+		}
+
+		return len(data), nil
 
 	case Done:
 		fmt.Printf("parser in done state - should not happen")
